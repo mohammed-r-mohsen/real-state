@@ -1,0 +1,130 @@
+<?php
+
+namespace App\Http\Controllers\Admin;
+
+use App\Http\Controllers\Controller;
+use Illuminate\Http\Request;
+use App\User;
+use App\Order;
+
+class AllUsersController extends Controller
+{
+  
+    public function home()
+    {
+        return view('admin.all_users',['pageTitle'=>'Pages','pageSubTitle'=>trans('admin.all_users')]);
+    }
+    public function users_chat()
+    {
+        return view('admin.users_chat',['pageTitle'=>'Pages','pageSubTitle'=>'users chat']);
+    }
+
+    public function index()
+    {
+        $users=User::latest()->paginate(40);
+
+        return $users;
+    }
+    public function get_users(){
+        if(admin()->type=='admin'){
+            return User::latest()->get();
+        } else{
+            return User::where('admin_id',admin()->id)->latest()->get();
+        }
+    }
+    public function get_users_no_packages(){
+        
+        $users_has_package=Order::where('status','active')->pluck('user_id');
+        if(admin()->type=='admin'){
+        $users= User::whereNotIn('id',$users_has_package)->latest()->get();
+        }else{
+            $users= User::where('admin_id',admin()->id)->whereNotIn('id',$users_has_package)->latest()->get();
+
+        }
+
+        return $users;
+    }
+    public function get_users_has_packages(){
+        $users_has_package=Order::where('status','active')->pluck('user_id');
+        if(admin()->type=='admin'){
+        $users= User::whereIn('id',$users_has_package)->latest()->get();
+        }else{
+            $users= User::where('admin_id',admin()->id)->whereIn('id',$users_has_package)->latest()->get();
+
+        }
+        return $users;
+    }
+    
+  
+    public function store(Request $request)
+    {
+        $data=$this->validate($request,[
+            'name' => ['required', 'string', 'max:191'],
+            'phone' => ['required', 'string', 'max:191'],
+            'state_id' => ['required', 'numeric',],
+            'is_provider' => ['nullable', 'boolean', 'max:191'],
+            'email' => ['required', 'string', 'email', 'max:191', 'unique:users'],
+            'avatar' => ['nullable', 'string'],
+            'address' => ['nullable', 'string'],
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+        ]);
+        if($request->avatar){
+            $relativePath=uploadImage($request->avatar);
+            $data['avatar']=$relativePath;
+        }
+        if($request->password){
+            $data['password']=bcrypt($request->password);
+        }
+        $data['admin_id']=admin()->id;
+        $user=User::create($data);
+        return $user;
+    }
+
+    public function update(Request $request, $id)
+    {
+        $user=User::find($id);
+        $this->validate($request,[
+            'name' => ['required', 'string', 'max:191'],
+            'phone' => ['required', 'string', 'max:191'],
+            'state_id' => ['required', 'numeric',],
+            'is_provider' => ['nullable', 'boolean', 'max:191'],
+            'email' => ['required', 'string', 'email', 'max:191', 'unique:users,email,'.$id],
+            'address' => ['nullable', 'string'],
+            'password' => ['nullable', 'string', 'min:8', 'confirmed'],
+        ]);
+        $data=([
+            'name'=>$request->name,
+            'phone'=>$request->phone,
+            'is_provider'=>$request->is_provider,
+            'email'=>$request->email,
+            'address'=>$request->address,
+        ]);
+        if($request->password){
+            $data['password']=bcrypt($request->password);
+        }
+        if($request->avatar){
+            $relativePath=uploadImage($request->avatar);
+            $data['avatar']=$relativePath;
+        }
+        $user->update($data);
+        return 'success';
+    }
+
+  
+    public function destroy($id)
+    {
+        $user=User::find($id);
+
+        $user->delete();
+        return 'success';
+    }
+
+    public function search($query){
+      
+
+            return User::where('name','like','%'.$query.'&')
+            ->orwhere('name','email','%'.$query.'&')
+            ->orwhere('name','phone','%'.$query.'&')
+            ->paginate(40);
+    }
+}
